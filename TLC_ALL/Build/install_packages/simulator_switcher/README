@@ -1,4 +1,0 @@
-Simulator helps to run ValueStor without phyzical tape library. It will simulate the tape library.
-
-After install the ValueStor, run ./switch2Sim.sh to install the simulator stuff.
-The service will be started automatically after installation.

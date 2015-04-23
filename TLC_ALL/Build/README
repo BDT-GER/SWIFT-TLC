@@ -1,0 +1,10 @@
+The ltfs package will be installed as compiled binaries.
+
+The binary package for IBM is ./install_packages/TLC/3rd_Party/Tars/IBMLTFS_SE_CENTOS7.tar.gz.  
+This is compiled from ltfssde-2.2.0.2 version, it can be downloaded from IBM Website.
+
+
+The binary package for HP is ./install_packages/TLC/3rd_Party/Tars/HPLTFS_BINARIES_x64.tar.gz.  
+This is compiled from HP_StoreOpen_Standalone_2.2.1 version, it can be downloaded from HP Website.
+    
+    

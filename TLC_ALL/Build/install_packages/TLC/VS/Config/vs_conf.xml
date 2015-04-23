@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf8"?>
+<VSConf>
+	<CacheFreeMinSize>15G</CacheFreeMinSize>
+	<CacheFreeMaxSize>25G</CacheFreeMaxSize>
+	<CacheFreeMinPercent>20</CacheFreeMinPercent>
+	<CacheFreeMaxPercent>30</CacheFreeMaxPercent>
+	<CacheFileSizeRead>4G</CacheFileSizeRead>
+	<CacheFileSizeBlock>128M</CacheFileSizeBlock>
+	<FileMaxSize>0</FileMaxSize>
+	<TapeIdleTime>10</TapeIdleTime>
+	<FileIdleTime>3</FileIdleTime>
+	<DigestMD5Enable>True</DigestMD5Enable>
+	<DigestSHA1Enable>False</DigestSHA1Enable>
+	<MetaFileSize>1M</MetaFileSize>
+	<FilterFilePattern/>
+    <FilterFolderPattern></FilterFolderPattern>
+    <WriteToTapeFilePattern>^/objects/[^/]+/[^/]+/[^/]+/[^/]+\.data$</WriteToTapeFilePattern>
+	<WriteToTapeFolderPattern/>
+	<TapeReservedMinFreeSize>50G</TapeReservedMinFreeSize>
+    <DeleteTapeFileTriggerNum>1000</DeleteTapeFileTriggerNum>
+    <DeleteTapeFileTimeDiff>86400</DeleteTapeFileTimeDiff>
+    <IgnoreWriteByReadCheckTime>300</IgnoreWriteByReadCheckTime>
+    <IgnoreWriteByReadPercent>80</IgnoreWriteByReadPercent>
+</VSConf>

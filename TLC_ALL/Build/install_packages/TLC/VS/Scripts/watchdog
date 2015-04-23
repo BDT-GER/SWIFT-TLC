@@ -1,0 +1,40 @@
+#!/bin/bash
+isSimulator=`cat /usr/VS/version | grep SIMULATOR`
+if [ ! -z $isSimulator ];then
+    VFS_BIN_BASENAME="vfsserver-simulator"
+else
+    VFS_BIN_BASENAME="vfsserver"
+fi
+FULL_PATH_VFS="/usr/VS/vfs/${VFS_BIN_BASENAME}"
+    ps ax | grep ${FULL_PATH_VFS} | grep -v "grep"
+    RETVAL=$?
+    case ${RETVAL} in
+    0)
+    #Service running, do nothing...
+	;;
+	1)
+	    echo "`date +%D-%H:%M:%S`: Service dead, restarting it." >> /var/log/vs/watchdog.log
+	    /etc/init.d/vs restart >> /var/log/vs/watchdog.log 2>&1
+	;;
+	*)
+	    echo "`date +%D-%H:%M:%S`: Service status unknown(${RETVAL}), restarting it." >> /var/log/vs/watchdog.log
+	    /etc/init.d/vs restart >> /var/log/vs/watchdog.log 2>&1
+	;;
+    esac
+    
+    # check if rsyncd service is running
+    systemctl status rsyncd.service  | grep "Active: active (running)"
+    RETVAL=$?
+    case ${RETVAL} in
+    0)
+    #Service running, do nothing...
+    ;;
+    1)
+        echo "`date +%D-%H:%M:%S`: rsyncd service dead, restarting it." >> /var/log/vs/watchdog.log
+        systemctl restart rsyncd.service >> /var/log/vs/watchdog.log 2>&1
+    ;;
+    *)
+        echo "`date +%D-%H:%M:%S`: rsyncd service status unknown(${RETVAL}), restarting it." >> /var/log/vs/watchdog.log
+        systemctl restart rsyncd.service >> /var/log/vs/watchdog.log 2>&1
+    ;;
+    esac

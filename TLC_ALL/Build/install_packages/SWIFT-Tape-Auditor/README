@@ -1,9 +1,0 @@
-ValueStore backend for OpenStack Swift
-==============================================
-
-Installation
-------------
-
-1. run "./install.sh install" to install the backend.
-
-2. to uninstall it, run "./install.sh uninstall"  

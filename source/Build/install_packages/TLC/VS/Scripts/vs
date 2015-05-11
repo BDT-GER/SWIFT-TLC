@@ -1,0 +1,409 @@
+#!/bin/sh
+#
+# chkconfig: 2345 27 76
+# description: Script to manage VS service
+#
+
+### BEGIN INIT INFO
+# Provides:      vs
+# Required-Start: $network $remote_fs $syslog $lin_tape
+# Required-Stop: $null
+# Should-Start: $network $remote_fs $syslog $lin_tape
+# Should-Stop:  $null
+# Default-Start: 3 5
+# Default-Stop:  0 1 2 6
+# Description:  Script to manage VS service
+### END INIT INFO
+
+PRODUCT_NAME="VS"
+PRODUCT_NAME_LOWCASE="vs"
+LTFS_INSTALL_ROOT="/usr/${PRODUCT_NAME}"
+LTFS_TAPE_MOUNT_POINT="/opt/${PRODUCT_NAME}/${PRODUCT_NAME_LOWCASE}Mounts"
+DISKCACHE_PATH="/opt/${PRODUCT_NAME}/${PRODUCT_NAME_LOWCASE}Cache/diskCache"
+META_PATH="/opt/${PRODUCT_NAME}/${PRODUCT_NAME_LOWCASE}Cache/meta"
+MAIN_CONF="/etc/${PRODUCT_NAME_LOWCASE}/${PRODUCT_NAME_LOWCASE}_conf.xml"
+PID_FILE="/var/run/vfsserver.pid"
+FULLPATH_VFS_BIN="/usr/${PRODUCT_NAME}/vfs/vfsserver"
+VFS_BIN_BASENAME='vfsserver'
+CRONFILE="/etc/crontab"
+
+
+function logMsg()
+{
+        #$1 Log Type: INFO | SUCCESS | FAILURE
+        #$2 Log Message
+        #$3 keyword string to highlight
+        #Usage: logMsg suc "Samba Service is running" "Samba"
+	RED="\e[0;31m"
+	NOR="\e[0;0m"
+	GREEN="\e[0;32m"
+	YELLOW="\e[0;33m"
+
+        case $1 in
+        INFO|info)
+        msgHeadCol=$GREEN
+        logType="[INFO]"
+        msgBodyCol=$NOR
+        ;;
+        IGNORE|ignore)
+        msgHeadCol=$GREEN
+        logType="[IGNORE]"
+        msgBodyCol=$NOR
+        ;;
+        SUCCESS|success|suc)
+        msgHeadCol=$GREEN
+        logType="[SUCCESS]"
+        msgBodyCol=$GREEN
+        ;;
+        FAILURE|failure|fail)
+        msgHeadCol=$RED
+        logType="[FAILURE]"
+        msgBodyCol=$RED
+        ;;
+        WARNING|warning|warn)
+        msgHeadCol=$RED
+        logType="[WARNING]"
+        msgBodyCol=$NOR
+        esac
+        msg=$2
+        if [ "$3" ]; then
+                msg=${2/$3/"$YELLOW'$3'$msgBodyCol"}
+        fi
+	if [ "$4" == "ne" ]; then
+	    opt="-ne"
+	else
+	    opt="-e"
+	fi
+        echo $opt "${msgHeadCol}${logType}${msgBodyCol} $msg $NOR" 
+	if [ $logType = "[FAILURE]" ];then
+	    exit 1
+	fi
+}
+
+function cleanCache(){
+    logMsg info "Cleaning Suds Cache"
+    if [ -d "/tmp/suds/" ];then
+        cacheExist=`ls /tmp/suds/ | wc -l`
+        if [ $cacheExist != 0 ];then
+            logMsg info "Suds cache found, cleaning cache folder." "Suds"
+            rm /tmp/suds/*
+        else
+            logMsg info "No Suds cache is found" "Suds"
+        fi
+    fi
+    
+
+}
+
+function cleanPipeCache(){
+    logMsg info "Cleaning pipe Cache."
+    pipeCacheExist=`ls -l /tmp/.socket.${PRODUCT_NAME}.* 2>/dev/null`
+    if [ $? != 0 ];then
+	logMsg info "No pipe cache is found" "pipe"
+    else
+	logMsg info "Pipe cache found, cleaning pipe cache." "Pipe"
+	rm -rf /tmp/.socket.${PRODUCT_NAME}.*
+    fi 
+}
+
+function disableWatchDog(){
+    logMsg info "Disabling watchdog."
+    sed -i "s%\(.*/usr/${PRODUCT_NAME}/scripts/watchdog\)%#*/1 * * * * root sh /usr/${PRODUCT_NAME}/scripts/watchdog%" ${CRONFILE}
+}
+
+function enableWatchDog(){
+    logMsg info "Enabling watchdog."
+    sed -i "s%\(^#\)\(.*/usr/${PRODUCT_NAME}/scripts/watchdog\)%*/1 * * * * root sh /usr/${PRODUCT_NAME}/scripts/watchdog%" ${CRONFILE}
+}
+
+
+function waitTillProcEnd()
+{
+    retry=0
+    echo -ne "Waiting for $VFS_BIN_BASENAME process to be terminated."
+    while true
+    do
+        retry=$(($retry+1))
+        if [ $retry -eq 150 ];then
+	    timeOut=15
+	    counter=15
+	    countDownStr="/${YELLOW}${timeOut}${NOR}(Yes/No): "
+	    echo && logMsg info "Wait 5 mins, the ${VFS_BIN_BASENAME} still not yet be terminated, do you want to continue wait?" "${VFS_BIN_BASENAME}"
+	    while true
+	    do
+		if [ ${counter} -le 9 ];then
+	            echo -ne "\r${counter}${countDownStr}"
+	        else
+        	    echo -ne "\r${counter}${countDownStr}"
+	        fi
+	        echo -en "\e[1C" #Move the cursor to the end.
+	        read -t 1 YesOrNo 
+	        if [ -z $YesOrNo ];then # User hasn't input anything
+        	    if [ $counter -eq 0 ];then
+	                if [ -z $YesOrNo ];then
+        	            YesOrNo=No
+	                fi
+	            fi
+        	    counter=$(($counter-1))
+	        fi
+	        if [ ! -z $YesOrNo ];then
+	            case $YesOrNo in
+        	        Y* | y* )
+			    retry=0
+			    logMsg info "Waiting another 5 mins for $VFS_BIN_BASENAME process to be terminated." ${VFS_BIN_BASENAME} "ne"
+			    break
+	            ;;
+	                N* | n* | "" )
+                        procExists=`ps -p $1 > /dev/null`
+                        if [ $? != 0 ];then
+                            echo && logMsg success "$VFS_BIN_BASENAME process is terminated already!" "$VFS_BIN_BASENAME" "ne"
+	                        if [ -e ${PID_FILE} ];then
+                        		rm -rf ${PID_FILE}
+                    	    fi
+                            return 0 
+                        else
+                	        echo && logMsg failure "The $VFS_BIN_BASENAME still not be terminated, please check the problem" "$VFS_BIN_BASENAME"
+                        fi
+	            ;;
+		        *)
+		            logMsg warn "Unknown Input ${YesOrNo}." "${YesOrNo}"
+		            YesOrNo=""
+		            counter=15
+        	    esac
+	        fi
+	    done
+        fi
+        echo -ne '.'
+        procExists=`ps -p $1 > /dev/null`
+        if [ $? -eq 0 ];then
+            sleep 2
+            continue
+        else
+            echo && logMsg success "$VFS_BIN_BASENAME process is terminated." "$VFS_BIN_BASENAME" "ne"
+	    if [ -e ${PID_FILE} ];then
+		rm -rf ${PID_FILE}
+	    fi
+            break
+        fi
+    done
+}
+
+function umountAllLtfs()
+{
+    timeRetry=0
+    mountStatus=`ps -ef | grep "ltfs ${LTFS_TAPE_MOUNT_POINT}*" | grep -v "grep"`
+    if [ $? == 0 ];then
+        echo -ne "Waiting for ltfs process to be terminated."
+	ltfsMntPoints=`mount | grep 'ltfs on' | awk '{print$3}'`
+	for mntPoint in $ltfsMntPoints
+	do 
+            fusermount -u $mntPoint
+            if [ $? -ne 0 ];then
+                logMsg failure "Failed to unmount $mntPoint, please check."
+            fi
+	done
+        while true
+        do
+            timeRetry=$(($timeRetry+1))
+            if [ $timeRetry -eq 600 ];then
+                echo && logMsg failure "Wait for 20 mins, the ltfs process still not be terminated, please check the problem" "ltfs"
+            fi
+            echo -ne '.'
+
+            chkPoc=`ps -ef | grep "ltfs ${LTFS_TAPE_MOUNT_POINT}*" | grep -v "grep"`
+            if [ $? = 0 ];then
+                sleep 2
+                continue
+            else
+                echo && logMsg info "ltfs process is terminated." "ltfs"
+                break
+            fi
+        done
+        logMsg info "Removing contents under folder ${LTFS_TAPE_MOUNT_POINT}" "${LTFS_TAPE_MOUNT_POINT}"
+        rm -rf ${LTFS_TAPE_MOUNT_POINT}/*
+        if [ $? -ne 0 ];then
+            logMsg failure "Failure to remove."
+        else
+            logMsg info "All contents under ${LTFS_TAPE_MOUNT_POINT} are removed." "${LTFS_TAPE_MOUNT_POINT}"
+        fi
+    fi
+
+}
+
+
+function chk_lin_tape(){
+    LINTAPE_RPM_SRC="lin_tape-2.9.4-1.src.rpm"
+    REBUILT_LINTAPE_RPM_NAME="lin_tape-2.9.4-1.x86_64.rpm"
+    LINTAPED_RPM="lin_taped-2.9.4-rhel6.x86_64.rpm"
+
+    modprobe lin_tape 2>/dev/null 
+    if [ ! $? -eq 0 ];then
+        logMsg warn "Failed to modprobe lin_tape, this could due to the kernel upgraded, will try to rebuild the lin_tape source."
+        logMsg info "Removing the previous installed lin_tape relate packages" "lin_tape"
+	rpm -e lin_tape lin_taped 2>/dev/null 1>&2
+        cd /usr/${PRODUCT_NAME}/lintape
+        if [ -e ${LINTAPE_SRC_RPM} ];then
+            logMsg info "Found lin_tape src rpm, rebuilding..."
+            rpmbuild --rebuild ${LINTAPE_SRC_RPM} >/tmp/rebuild_lin_tape.log 2>&1
+            if [ $? -ne 0 ];then
+                logMsg failure "Rebuild lin_tape failure!!!" "lin_tape"
+            else
+                logMsg success "Rebuild lin_tape success." "lin_tape"
+                if [ -e /usr/src/packages/RPMS/x86_64/${REBUILT_LIN_TAPE_RPM} ];then
+                    logMsg info "Installing rebuilt lin_tape" "lin_tape"
+                    cmdInstLinTape="rpm -Uvh /usr/src/packages/RPMS/x86_64/${REBUILT_LIN_TAPE_RPM}"
+                    instLinTapeResult=`$cmdInstLinTape 2>&1`
+                    if [ $? -ne 0 ];then
+                        i=`echo $instLinTapeResult | grep 'already installed'`
+                        if [ $? = 0 ];then
+                            logMsg ignore 'lin_tape was installed, no need to install again' 'lin_tape'
+                        else
+                            logMsg failure "$instLinTapeResult"
+                        fi
+                    else
+                        logMsg success "${LINTAPE_SRC_RPM} has been installed." "${LINTAPE_SRC_RPM}"
+                    fi
+                fi
+            fi
+        else
+            logMsg failure "${LINTAPE_SRC_RPM} doesn't exist" "${LINTAPE_SRC_RPM}"
+        fi
+
+        logMsg info "Installing lin_taped" "lin_taped"
+        if [ -e $LINTAPED_RPM ];then
+            cmdInstLinTaped="rpm -Uvh $LINTAPED_RPM"
+            instLinTapedResult=`$cmdInstLinTaped 2>&1`
+            if [ $? -ne 0 ];then
+                i=`echo $instLinTapedResult | grep 'already installed'`
+                if [ $? = 0 ];then
+                    logMsg ignore "${LINTAPED_RPM} was installed, no need to install again" "${LINTAPED_RPM}"
+                else
+                    echo "$instLinTapedResult"
+                    logMsg failure "$instLinTapedResult"
+                fi
+            else
+                logMsg success "${LINTAPED_RPM} has been installed" "${LINTAPED_RPM}"
+            fi
+        else
+            logMsg failure "rpm package: ${LINTAPED_RPM} doesn't exist" "${LINTAPED_RPM}"
+        fi
+    fi
+}
+
+start() {
+    logMsg info "Starting ${PRODUCT_NAME} service" "${PRODUCT_NAME}"
+    if [ ! -f ${MAIN_CONF} ]; then
+        echo -n >&2 "${PRODUCT_NAME} configuration file, ${MAIN_CONF} does not exist. "
+        exit 6
+    fi
+    mysqlSrcState=`systemctl status mariadb.service`
+    if [ $? -ne 0 ];then
+	if [ -e /var/lib/mysql/mysql.sock ];then
+            rm -f /var/lib/mysql/mysql.sock
+	fi
+        systemctl restart mariadb.service
+	if [ $? -ne 0 ];then
+	    logMsg fail "Failed to start mysql service, will not start the vs service."
+	fi
+    fi
+    ps ax | grep ${FULLPATH_VFS_BIN} | grep -v "grep"
+    case $? in
+        0) logMsg warn "vfsserver daemon already running." "vfsserver" "ne"
+	   exit 0
+	;;
+    #    1) logMsg warn "${PID_FILE} exists but vfsserver isn't running, unclean stop ?" "vfsserver" "ne"
+	# ;;
+    esac 
+
+    systemctl restart mariadb.service
+    retry=0
+        export PATH=$PATH:/usr/local/bin/
+        modprobe fuse
+	logMsg info "Starting vfsserver..." "vfsserver"
+	${FULLPATH_VFS_BIN} ${LTFS_TAPE_MOUNT_POINT} ${META_PATH} ${DISKCACHE_PATH} -o allow_other,default_permissions
+	if [ $? -ne 0 ];then
+	    logMsg failure "An error is occured lead to vfsserver failed to be started, please check." "vfsserver"
+	else
+	    logMsg success "vfsserver is started." "vfsserver"
+	fi
+
+        RETVAL=$?
+        if [ $RETVAL = 0 ];then
+	    enableWatchDog
+            logMsg success "${PRODUCT_NAME} Service has been started!" "${PRODUCT_NAME}"
+            return $RETVAL
+        fi
+}
+
+
+stop() {
+	logMsg info "Stopping ${PRODUCT_NAME} service: " "${PRODUCT_NAME}"
+	disableWatchDog
+	cleanCache
+	ps ax | grep  ${FULLPATH_VFS_BIN} | grep -v "grep"
+	srvExitCode=$?
+	case $srvExitCode in
+	    0)
+	        realPid=`cat ${PID_FILE}`
+	        logMsg info "Stopping vfsserver daemon." "vfsserver" "ne" 
+	        kill -n TERM $realPid
+                waitTillProcEnd $realPid
+	    ;;
+	    *)
+	        logMsg warn "Stopping ${PRODUCT_NAME_LOWCASE} service failed with unknown return code ${srvExitCode}" "${PRODUCT_NAME_LOWCASE}"
+	    ;;
+	esac
+	cleanPipeCache	
+	RETVAL=$?
+	if [ $RETVAL = 0 ];then
+	    logMsg success "${PRODUCT_NAME} Service has been stopped!" "${PRODUCT_NAME}"
+	    return $RETVAL
+	fi
+}	
+
+restart() {
+	stop
+	echo -ne ${YELLOW}
+        location=$((`stty size | awk '{print$2}'` / 2))
+        k=1
+        while [ $k -le $location ]
+        do
+            echo -ne ">"
+            sleep 0.03
+            k=$(( k + 1))
+        done
+	echo -e "${GREEN}"
+        while [ $(( $location )) -ge 0 ]
+        do
+            echo -ne "\r\e[$(( ${location} -1 ))C<"
+            sleep 0.03 && echo -ne "\r"
+            location=$(( $location - 1 ))
+        done
+	echo -e ${NOR} 
+	start
+}
+
+status() {
+                logMsg info "Checking for vfsserver daemon status " "vfsserver" "ne"
+                ps ax | grep  ${FULLPATH_VFS_BIN} | grep -v "grep"
+}
+action="$1"
+case "$action" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart | rs)
+  	restart
+	;;
+  status)
+	status
+	;;
+  *)
+	echo $"Usage: $0 {start | stop | restart | status}"
+	exit 2
+esac
+
+exit $?

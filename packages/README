@@ -1,0 +1,8 @@
+tlc.0.9.x.tar.gz: the package for the Tape Library Connector to swift.
+
+CentOS7-SWIFT.0.9.x.tar.gz: the package to install swift stuff on CENTOS 7.
+
+SWIFT-Tape-Auditor.0.9.x.tar.gz: the package to install tape auditor patch for swift.
+
+Tools/simulator_switcher.0.9.x.tar.gz: The simulate tool for Tape Library Connector, to simulator a tape library. Need to install tlc.0.9.x.tar.gz first.
+

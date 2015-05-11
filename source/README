@@ -1,0 +1,6 @@
+Run "./build_package.sh $main_version $sub_version $build " to build the backage. Before doing this, need to update the version info in the following files:
+* ./Build/install_packages/TLC/version
+* ./Build/install_packages/TLC/install.sh
+* ./Build/install_packages/simulator_switcher/version (only needed if we want to build the simulator package)
+
+packages will be built under ./Build/install_packages/*.tar.gz

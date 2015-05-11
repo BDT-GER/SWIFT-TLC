@@ -1,0 +1,13 @@
+prefix=/root/log4plus
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+modules=
+
+Name: log4cplus
+Version: 1.1.1
+Description: Simple to use, thread-safe C++ logging API
+Requires:
+Libs: -L${libdir} -llog4cplus
+Libs.private:  
+Cflags: -I${includedir}

@@ -6,7 +6,7 @@ YELLOW="\e[0;33m"
 
 PKG_MAIN_VER="0"
 PKG_SUB_VER="9"
-PKG_BUILD_NUM="8"
+PKG_BUILD_NUM="9"
 pkgVer="${PKG_MAIN_VER}.${PKG_SUB_VER}.${PKG_BUILD_NUM}"
 CURRENT_PATH=`pwd`
 LTFS_SOURCE="${CURRENT_PATH}/VS"
@@ -205,7 +205,7 @@ function installIbmLtfsSE()
 function uninstallIbmLtfsSE()
 {
     logMsg info "Removing IBM LTFS SE..."
-    rm -f /usr/local/bin/*ltfs* /usr/local/lib/libltfs* /usr/local/lib/ltfs/* /usr/local/etc/ltfs.conf* /usr/local/share/ltfs/* /usr/local/share/snmp/*
+    rm -rf /usr/local/bin/*ltfs* /usr/local/lib64/libltfs* /usr/local/lib64/ltfs/* /etc/ltfs.conf* /opt/IBM/ltfs /usr/local/share/doc/ltfssde*
     if [ $? == 0 ];then
         logMsg success "IBM LTFS SE has been uninstalled."
     else
@@ -238,9 +238,9 @@ function uninstallIbmLtfsSE_OLD()
 
 function installLinTape()
 {
-    LINTAPE_RPM_SRC="lin_tape-2.9.4-1.src.rpm"
-    REBUILT_LINTAPE_RPM_NAME="lin_tape-2.9.4-1.x86_64.rpm"
-    LINTAPED_RPM="lin_taped-2.9.4-rhel6.x86_64.rpm"
+    LINTAPE_RPM_SRC="lin_tape-2.9.6-1.src.rpm"
+    REBUILT_LINTAPE_RPM_NAME="lin_tape-2.9.6-1.x86_64.rpm"
+    LINTAPED_RPM="lin_taped-2.9.6-rhel6.x86_64.rpm"
     cd ${IBM_LINTAPE_RPM}
     if [ ! -e "${LINTAPE_RPMS_ON_INSTROOT}" ];then
     	mkdir $LINTAPE_RPMS_ON_INSTROOT -p
@@ -976,6 +976,14 @@ function removeMysqlDB(){
     done
 }
 
+function autoLoadSgModule()
+{
+    grep "modprobe sg" /etc/rc.modules
+	if [ $? ne 0 ];then
+        echo "modprobe sg" >> /etc/rc.modules
+    fi
+}
+
 function main()
 {
     chkXfs 2>$LOG_ROOT/err.log
@@ -1040,6 +1048,7 @@ case "$1" in
 	chkInstVer
 	chkAndUmountTape
     check_vendor
+    autoLoadSgModule
     main
 	if [ $? = 0 ];then
             logMsg success "${YELLOW}CONGRATULATIONS!!${GREEN} The Fresh Installation has been completely done! Installed version: ${pkgVer}" "${pkgVer}"
@@ -1057,6 +1066,7 @@ case "$1" in
 	welcomeInfo
 	chkInstVer
 	chk_LTFS_Vendor
+    autoLoadSgModule
 
         logMsg info "Stopping services."
 	if [ -s /etc/init.d/vs ];then

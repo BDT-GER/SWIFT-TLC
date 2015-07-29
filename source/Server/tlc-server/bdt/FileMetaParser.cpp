@@ -145,8 +145,6 @@ namespace bdt
                 manifest_ = "";
                 LogWarn("Un-expected manifest " << manifest_);
             }
-        } else {
-            manifest_ = "";
         }
 
         Py_DECREF(result);

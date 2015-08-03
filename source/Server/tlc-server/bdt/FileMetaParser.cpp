@@ -84,8 +84,14 @@ namespace bdt
     bool
     FileMetaParser::ParseSwift(string meta)
     {
-        static const boost::regex namePattern(".*/(\\d+[[.period.]]\\d+)/(\\d+)/(\\d+)/(\\d+)$");
-        static const boost::regex manifestPattern(".*/(\\d+[[.period.]]\\d+)/(\\d+)/(\\d+)/$");
+        static const boost::regex namePattern("^(.*)/(\\d+[[.period.]]\\d+)/(\\d+)/(\\d+)/(\\d+)$");
+        static const boost::regex manifestPattern("^(.*)/(\\d+[[.period.]]\\d+)/(\\d+)/(\\d+)/$");
+
+        isMultiple_ = false;
+        isManifest_ = false;
+        number_ = 0;
+        total_ = 1;
+        manifest_ = "";
 
         PyObject * content = PyString_FromString(meta.c_str());
         PyObject * args = PyTuple_New(1);
@@ -100,6 +106,7 @@ namespace bdt
 
         PyObject * valueName = PyDict_GetItemString(result, SwiftKeyName.c_str());
         if ( valueName == NULL ) {
+            Py_DECREF(result);
             return false;
         } else {
             name_ = PyString_AsString(valueName);
@@ -109,7 +116,7 @@ namespace bdt
         if ( valueSingle != NULL ) {
             isMultiple_ = false;
             isManifest_ = false;
-            number_ = -1;
+            number_ = 0;
             total_ = 1;
         } else {
             isMultiple_ = true;
@@ -117,13 +124,15 @@ namespace bdt
             boost::smatch what;
             if ( boost::regex_match(
                     name_, what, namePattern, boost::match_extra ) ) {
-                manifest_ = "/" + what[1] + "/" + what[2] + "/" + what[3] + "/";
-                number_ = boost::lexical_cast<int>(what[4]);
-                long long totalSize = boost::lexical_cast<long long>(what[2]);
-                long long segmentSize = boost::lexical_cast<long long>(what[3]);
+                manifest_ = "/" + what[2] + "/" + what[3] + "/" + what[4] + "/";
+                number_ = boost::lexical_cast<int>(what[5]);
+                long long totalSize = boost::lexical_cast<long long>(what[3]);
+                long long segmentSize = boost::lexical_cast<long long>(what[4]);
                 total_ = (totalSize + segmentSize - 1) / segmentSize;
             } else {
-                number_ = -1;
+                isMultiple_ = false;
+                isManifest_ = false;
+                number_ = 0;
                 total_ = 1;
                 LogWarn("Un-expected name " << name_);
             }
@@ -137,12 +146,16 @@ namespace bdt
             boost::smatch what;
             if ( boost::regex_match(
                     manifest_, what, manifestPattern, boost::match_extra ) ) {
-                manifest_ = "/" + what[1] + "/" + what[2] + "/" + what[3] + "/";
-                long long totalSize = boost::lexical_cast<long long>(what[2]);
-                long long segmentSize = boost::lexical_cast<long long>(what[3]);
+                manifest_ = "/" + what[2] + "/" + what[3] + "/" + what[4] + "/";
+                long long totalSize = boost::lexical_cast<long long>(what[3]);
+                long long segmentSize = boost::lexical_cast<long long>(what[4]);
+                number_ = -1;
                 total_ = (totalSize + segmentSize - 1) / segmentSize;
             } else {
-                manifest_ = "";
+                isMultiple_ = false;
+                isManifest_ = false;
+                number_ = 0;
+                total_ = 1;
                 LogWarn("Un-expected manifest " << manifest_);
             }
         }

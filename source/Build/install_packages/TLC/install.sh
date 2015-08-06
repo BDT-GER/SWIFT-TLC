@@ -199,13 +199,18 @@ function installIbmLtfsSE()
     else
         logMsg failure "IBMLTFS_BINARIES_SLES11 doesn't exist" "IBMLTFS_SE_BINARIES_CENTOS7"
     fi
+    if [ -e /etc/ltfs.conf ];then
+	logMsg info "Creating symbol link from /etc/ltfs.conf to /usr/local/etc/ltfs.conf"
+	rm -rf /usr/local/etc/ltfs.conf
+	ln -s /etc/ltfs.conf /usr/local/etc/ltfs.conf
+    fi
 }
 
 
 function uninstallIbmLtfsSE()
 {
     logMsg info "Removing IBM LTFS SE..."
-    rm -rf /usr/local/bin/*ltfs* /usr/local/lib64/libltfs* /usr/local/lib64/ltfs/* /etc/ltfs.conf* /opt/IBM/ltfs /usr/local/share/doc/ltfssde*
+    rm -rf /usr/local/bin/*ltfs* /usr/local/lib64/libltfs* /usr/local/lib64/ltfs/* /etc/ltfs.conf* /usr/local/etc/ltfs.conf /opt/IBM/ltfs /usr/local/share/doc/ltfssde*
     if [ $? == 0 ];then
         logMsg success "IBM LTFS SE has been uninstalled."
     else
@@ -771,7 +776,9 @@ function chkonSrv()
         if [ -e $LTFS_SOURCE_SCRIPTS/vs ];then
             logMsg info "Copying startup script to /etc/init.d/." "/etc/init.d/"
             \cp $LTFS_SOURCE_SCRIPTS/vs /etc/init.d/vs -arf
+	    \cp $LTFS_SOURCE_SCRIPTS/vs /etc/rc.d/init.d/vs -arf
             chmod 744 /etc/init.d/vs
+	    chmod 744 /etc/rc.d/init.d/vs
             chkconfig --add vs
             chkconfig --level 35 vs on
         else
@@ -783,12 +790,14 @@ function chkonSrv()
 	    if [ $? -ne 0 ];then
 		logMsg info "Update vs service script" "vs"
 		\cp $LTFS_SOURCE_SCRIPTS/vs /etc/init.d/vs -ar
+		\cp $LTFS_SOURCE_SCRIPTS/vs /etc/rc.d/init.d/vs -ar
 	    else
 		logMsg info "No update for vs service script" "vs"
 	    fi
 	else
 	    logMsg warn "vs service script doesn't exist, will copy a new one"
 	    \cp $LTFS_SOURCE_SCRIPTS/vs /etc/init.d/vs -ar
+	    \cp $LTFS_SOURCE_SCRIPTS/vs /etc/rc.d/init.d/vs -ar
 	fi 
     fi
 
@@ -978,9 +987,17 @@ function removeMysqlDB(){
 
 function autoLoadSgModule()
 {
-    grep "modprobe sg" /etc/rc.modules
-	if [ $? ne 0 ];then
-        echo "modprobe sg" >> /etc/rc.modules
+    if [ -e /etc/rc.modules ];then
+    	grep "modprobe sg" /etc/rc.modules
+	if [ $? -ne 0 ];then
+            echo "modprobe sg" >> /etc/rc.modules
+	    modprobe sg
+    	fi
+    else
+	touch /etc/rc.modules
+	chmod +x /etc/rc.modules
+	echo "modprobe sg" >> /etc/rc.modules
+	modprobe sg
     fi
 }
 
@@ -1153,13 +1170,16 @@ case "$1" in
 
 		logMsg info "Removing managing service: vs" "vs"
 		chkconfig --del vs
-		if [ -e "/etc/rc.d/rc5.d/S099vs" ];then 
-    		    rm "/etc/rc.d/rc5.d/S099vs"
-		elif [ -e "/etc/rc.d/rc3.d/S099vs" ];then
-		    rm "/etc/rc.d/rc3.d/S099vs"
+		if [ -e "/etc/rc.d/rc5.d/S27vs" ];then 
+    		    rm "/etc/rc.d/rc5.d/S27vs"
+		elif [ -e "/etc/rc.d/rc3.d/S27vs" ];then
+		    rm "/etc/rc.d/rc3.d/S27vs"
 		fi 
 		if [ -e "/etc/init.d/vs" ];then
 		    rm "/etc/init.d/vs"
+		fi
+		if [ -e "/etc/rc.d/init.d/vs" ]; then
+		    rm "/etc/rc.d/init.d/vs"
 		fi
 
 		logMsg info "Removing service chkIsDirty." "chkIsDirty" 

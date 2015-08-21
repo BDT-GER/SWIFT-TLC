@@ -6,7 +6,7 @@ YELLOW="\e[0;33m"
 
 PKG_MAIN_VER="0"
 PKG_SUB_VER="9"
-PKG_BUILD_NUM="9"
+PKG_BUILD_NUM="10"
 pkgVer="${PKG_MAIN_VER}.${PKG_SUB_VER}.${PKG_BUILD_NUM}"
 CURRENT_PATH=`pwd`
 LTFS_SOURCE="${CURRENT_PATH}/VS"
@@ -25,6 +25,9 @@ LTFS_TMP_FOLDER="${LTFS_INSTALL_ROOT}/tmp"
 VFS_ROOT="${LTFS_INSTALL_ROOT}/vfs"
 BIN_ROOT="${LTFS_INSTALL_ROOT}/bin"
 LINTAPE_RPMS_ON_INSTROOT="${LTFS_INSTALL_ROOT}/lintape"
+LINTAPE_RPM_SRC="lin_tape-2.9.6-1.src.rpm"
+REBUILT_LINTAPE_RPM_NAME="lin_tape-2.9.6-1.x86_64.rpm"
+LINTAPED_RPM="lin_taped-2.9.6-rhel6.x86_64.rpm"
 VFS_TARGET_PERMISSION_CTRL_FOLDER="/srv/"
 VFS_TARGET_FOLDER="/srv/node/"
 VFS_BIN_NAME="vfsserver"
@@ -241,11 +244,54 @@ function uninstallIbmLtfsSE_OLD()
     done
 }
 
+function buildLinTape()
+{
+    if [ -e $LINTAPE_RPM_SRC ];then    
+        logMsg info "Rebuilding lin_tape" "lin_tape"
+        rpm -q gcc
+        if [ $? -ne 0 ];then
+           yum install -y gcc
+        fi
+        rpm -q glibc-devel
+        if [ $? -ne 0 ];then
+           yum install -y glibc-devel
+        fi
+        rpm -q kernel-devel
+        if [ $? -ne 0 ];then
+           yum install -y kernel-devel
+        fi
+        rpm -q rpm-build
+        if [ $? -ne 0 ];then
+           yum install -y rpm-build
+        fi
+        rpmbuild --rebuild $LINTAPE_RPM_SRC > $LOG_ROOT/lin_tape_rebuild.log
+        if [ $? -ne 0 ];then
+            logMsg failure "Rebuild lin_tape failure!!!" "lin_tape"
+        else
+            logMsg success "Rebuild lin_tape success." "lin_tape"
+            if [ -e /root/rpmbuild/RPMS/x86_64/$REBUILT_LINTAPE_RPM_NAME ];then
+                logMsg info "Installing rebuilt lin_tape" "lin_tape"
+                cmdInstLinTape="rpm -Uvh /root/rpmbuild/RPMS/x86_64/$REBUILT_LINTAPE_RPM_NAME"
+                instLinTapeResult=`$cmdInstLinTape 2>&1`
+                  if [ $? -ne 0 ];then
+                    i=`echo $instLinTapeResult | grep 'already installed'`
+                    if [ $? = 0 ];then
+                        logMsg ignore "lin_tape was installed, no need to install again" "lin_tape"
+                    else
+                        logMsg failure "$instLinTapeResult"
+                    fi
+                else
+                    logMsg success "lin_tape has been installed." "lin_tape"
+                fi
+            fi
+        fi  
+    else
+          logMsg failure "$LINTAPE_RPM_SRC doesn't exist" "$LINTAPE_RPM_SRC"
+    fi
+}
+
 function installLinTape()
 {
-    LINTAPE_RPM_SRC="lin_tape-2.9.6-1.src.rpm"
-    REBUILT_LINTAPE_RPM_NAME="lin_tape-2.9.6-1.x86_64.rpm"
-    LINTAPED_RPM="lin_taped-2.9.6-rhel6.x86_64.rpm"
     cd ${IBM_LINTAPE_RPM}
     if [ ! -e "${LINTAPE_RPMS_ON_INSTROOT}" ];then
     	mkdir $LINTAPE_RPMS_ON_INSTROOT -p
@@ -262,7 +308,9 @@ function installLinTape()
             if [ $? -eq 0 ];then
                 logMsg ignore "lin_tape was installed, no need to install again" "lin_tape"
             else
-                logMsg failure "$instLinTapeResult"
+    		    rpm -e lin_tape
+    	    	#exitOnfailed "Unable to uninstall lin_tape."
+      		    buildLinTape 2>$LOG_ROOT/err.log
             fi
         else
 	        modprobe lin_tape
@@ -274,36 +322,7 @@ function installLinTape()
 		        logMsg info "Removing the previous installed lin_tape"
     		    rpm -e lin_tape
     	    	#exitOnfailed "Unable to uninstall lin_tape."
-	    	    if [ -e $LINTAPE_RPM_SRC ];then	
-		            logMsg info "Rebuilding lin_tape" "lin_tape"
-                    rpm -qa | grep gcc-
-                    if [ $? -ne 0 ];then
-                       yum install -y gcc-c++
-                    fi
-            	    rpmbuild --rebuild $LINTAPE_RPM_SRC > $LOG_ROOT/lin_tape_rebuild.log
-		            if [ $? -ne 0 ];then
-    			        logMsg failure "Rebuild lin_tape failure!!!" "lin_tape"
-        		    else
-	            		logMsg success "Rebuild lin_tape success." "lin_tape"
-            	    	if [ -e /root/rpmbuild/RPMS/x86_64/$REBUILT_LINTAPE_RPM_NAME ];then
-	        		        logMsg info "Installing rebuilt lin_tape" "lin_tape"
-	        		        cmdInstLinTape="rpm -Uvh /root/rpmbuild/RPMS/x86_64/$REBUILT_LINTAPE_RPM_NAME"
-        	    		    instLinTapeResult=`$cmdInstLinTape 2>&1`
-		      	            if [ $? -ne 0 ];then
-			            	    i=`echo $instLinTapeResult | grep 'already installed'`
-	        		            if [ $? = 0 ];then
-		                            logMsg ignore "lin_tape was installed, no need to install again" "lin_tape"
-                    		    else
-                       			 logMsg failure "$instLinTapeResult"
-                    		    fi
-    	        			else
-	        	    			logMsg success "lin_tape has been installed." "lin_tape"
-	    			        fi
-    			    	fi
-        			fi  
-	            else
-	      	        logMsg failure "$LINTAPE_RPM_SRC doesn't exist" "$LINTAPE_RPM_SRC"
-    		    fi
+      		    buildLinTape 2>$LOG_ROOT/err.log
 	        fi
         fi
     fi
@@ -382,23 +401,31 @@ function zyppInst()
     else
         yum install -y mariadb-server mariadb mariadb-libs
     fi
-    rpm -qa | grep fuse-libs
+    rpm -q fuse-libs
     if [ $? -ne 0 ];then
         yum install -y fuse-libs
+    fi
+    rpm -q xmlrpc-c-client++
+    if [ $? -ne 0 ];then
+        yum install -y xmlrpc-c-client++
+    fi
+    rpm -q boost
+    if [ $? -ne 0 ];then
+        yum install -y boost
     fi
 }
 
 function cpLib2InstDir()
 {
-    logMsg info "Copying boost lib." "boost"
+    logMsg info "Copying lib." "lib"
     if [ -e $LIB ]; then
-        logMsg info "Boost lib folder exists"
+        logMsg info "Lib folder exists"
 	mkdirWithPerm $LTFS_INSTALL_ROOT 705
         \cp $LIB $LTFS_INSTALL_ROOT/lib -arf
-	exitOnfailed "Failed to copied boost lib, please check if the install package is complete."
-        logMsg success "Boost lib copied"
+	exitOnfailed "Failed to copied lib, please check if the install package is complete."
+        logMsg success "Lib copied"
     else
-        logMsg failure "Boost lib folder doesn't exist."
+        logMsg failure "Lib folder doesn't exist."
     fi
 }
 
@@ -473,15 +500,15 @@ function installVfs()
 		rm -rf $LTFS_INSTALL_ROOT/lib.org
             else
                 if [ -e $LIB ]; then
-		    logMsg info "Boost lib folder exists."
+		    logMsg info "Lib folder exists."
                     \cp $LIB $LTFS_INSTALL_ROOT/lib -arf
                     if [ $? = 0 ];then
-                        logMsg success "Boost lib copied."
+                        logMsg success "Lib copied."
                     else
-                        logMsg failure "Failed to copied boost lib,Please check if the install package is complete."
+                        logMsg failure "Failed to copied lib,Please check if the install package is complete."
                     fi
                 else
-                    logMsg failure "Boost lib folder doesn't exist."
+                    logMsg failure "Lib folder doesn't exist."
                 fi
             fi
 	    makeDirStrc

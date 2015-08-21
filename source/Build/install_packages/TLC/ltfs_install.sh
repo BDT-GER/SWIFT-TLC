@@ -13,7 +13,7 @@ function uninstHpLtfs()
 
 function chk_LTFS_Vendor(){
     if [ $operation != 'install' ];then
-        ret=`ltfs -V 2>&1| grep "HP LTFS"`
+        ret=`ltfs -V 2>&1| grep "HP"`
         if [ $? = 0 ];then
             LTFS_DEFAULT_VENDOR='HP'
         setOpt "$CURRENT_PATH/version" "VENDOR" "HP"

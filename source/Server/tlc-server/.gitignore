@@ -1,0 +1,9 @@
+debug
+release
+simulator
+vfsclient
+vfsclient-simulator
+vfsserver
+vfsserver-simulator
+lfs_tool
+library_tool

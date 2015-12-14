@@ -89,6 +89,6 @@ Test_SOURCES = \
     ../InodeHandler.cpp ../Bitmap.cpp ../FileOperationBitmap.cpp \
     ../TapeManagerStop.cpp ../FileOperationInodeHandler.cpp
 
-Test_CXXFLAGS = $(CPPUNIT_CFLAGS) -Wall -I/root/boost/include -I/usr/include/python2.7 -I/root/xmlrpc/include -D_FILE_OFFSET_BITS=64 -DMORE_TEST -Wno-unused-local-typedefs -Wno-unused-variable
-Test_LDFLAGS = $(CPPUNIT_LIBS) -Wl,-rpath /usr/VS/lib -L /usr/VS/lib -ldl -lboost_system -lboost_filesystem -lboost_thread -lboost_date_time -lboost_regex -lcrypto -lssl -lxmlrpc -lxmlrpc_util -lxmlrpc_xmlparse -lxmlrpc_xmltok -lxmlrpc_server -lxmlrpc_packetsocket -lxmlrpc++ -lxmlrpc_server++ -lxmlrpc_server_pstream++ -lxmlrpc_client -lxmlrpc_client++ -lpython2.7
+Test_CXXFLAGS = $(CPPUNIT_CFLAGS) -Wall -I/usr/include/python2.7 -I/root/xmlrpc/include -D_FILE_OFFSET_BITS=64 -DMORE_TEST -Wno-unused-local-typedefs -Wno-unused-variable
+Test_LDFLAGS = $(CPPUNIT_LIBS) -Wl,-rpath /usr/VS/lib -L /usr/VS/lib -ldl -lboost_system -lboost_filesystem -lboost_thread -lboost_date_time -lboost_regex -lcrypto -lssl -lxmlrpc -lxmlrpc_util -lxmlrpc_server -lxmlrpc_packetsocket -lxmlrpc++ -lxmlrpc_server++ -lxmlrpc_server_pstream++ -lxmlrpc_client -lxmlrpc_client++ -lpython2.7
 Test_LDADD = ../../debug/libbdtltfs_tape.a ../../debug/libbdtltfs_tape_simulator.a

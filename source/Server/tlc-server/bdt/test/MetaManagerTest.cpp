@@ -354,51 +354,56 @@ MetaManagerTest::testBackup()
 
     vector<BackupItem> list;
     meta->GetBackupList(list);
-    CPPUNIT_ASSERT( 0 == list.size() );
+    CPPUNIT_ASSERT_EQUAL((size_t)0, list.size());
 
     file0.reset( meta->GetFileOperation(testFile0,O_RDWR) );
     meta->GetBackupList(list);
-    CPPUNIT_ASSERT_MESSAGE( boost::lexical_cast<string>(list.size()),
-            1 == list.size() );
-    CPPUNIT_ASSERT( list[0].path == testFile0 );
+    CPPUNIT_ASSERT_EQUAL((size_t)1, list.size());
+    CPPUNIT_ASSERT_EQUAL(testFile0, list[0].path.string());
 
     file0.reset();
     meta->GetBackupList(list);
-    CPPUNIT_ASSERT( 1 == list.size() );
-    CPPUNIT_ASSERT( list[0].path == testFile0 );
+    CPPUNIT_ASSERT_EQUAL((size_t)1, list.size());
+    CPPUNIT_ASSERT_EQUAL(testFile0, list[0].path.string());
 
     file1.reset( meta->GetFileOperation(testFile1,O_RDWR) );
     meta->GetBackupList(list);
-    CPPUNIT_ASSERT( 2 == list.size() );
-    CPPUNIT_ASSERT( list[0].path == testFile0 );
-    CPPUNIT_ASSERT( list[1].path == testFile1 );
+    CPPUNIT_ASSERT_EQUAL((size_t)2, list.size());
+    CPPUNIT_ASSERT_EQUAL(testFile0, list[0].path.string());
+    CPPUNIT_ASSERT_EQUAL(testFile1, list[1].path.string());
 
     file2.reset( meta->GetFileOperation(testFile2,O_RDWR) );
     meta->GetBackupList(list);
-    CPPUNIT_ASSERT( 3 == list.size() );
-    CPPUNIT_ASSERT( list[0].path == testFile0 );
-    CPPUNIT_ASSERT( list[1].path == testFile1 );
-    CPPUNIT_ASSERT( list[2].path == testFile2 );
+    CPPUNIT_ASSERT_EQUAL((size_t)3, list.size());
+    CPPUNIT_ASSERT_EQUAL(testFile0, list[0].path.string());
+    CPPUNIT_ASSERT_EQUAL(testFile1, list[1].path.string());
+    CPPUNIT_ASSERT_EQUAL(testFile2, list[2].path.string());
 
     backup.reset(new FileOperation(backupFile,0644,O_RDWR));
-    CPPUNIT_ASSERT( true == meta->Backup(testFile1,backup.get(),tape,path) );
-    CPPUNIT_ASSERT( path == testFile1 );
+    bool write = false;
+    CPPUNIT_ASSERT( meta->Backup(testFile1,backup.get(),tape,path,write) );
+    CPPUNIT_ASSERT_EQUAL(testFile1, path.string());
+    CPPUNIT_ASSERT( write );
     meta->GetBackupList(list);
-    CPPUNIT_ASSERT( 2 == list.size() );
-    CPPUNIT_ASSERT( list[0].path == testFile0 );
-    CPPUNIT_ASSERT( list[1].path == testFile2 );
-    CPPUNIT_ASSERT( true == meta->Backup(testFile0,backup.get(),tape,path) );
-    CPPUNIT_ASSERT( path == testFile0 );
+    CPPUNIT_ASSERT_EQUAL((size_t)2, list.size());
+    CPPUNIT_ASSERT_EQUAL(testFile0, list[0].path.string());
+    CPPUNIT_ASSERT_EQUAL(testFile2, list[1].path.string());
+    write = false;
+    CPPUNIT_ASSERT( meta->Backup(testFile0,backup.get(),tape,path,write) );
+    CPPUNIT_ASSERT_EQUAL(testFile0, path.string());
+    CPPUNIT_ASSERT( write );
     meta->GetBackupList(list);
-    CPPUNIT_ASSERT( 1 == list.size() );
-    CPPUNIT_ASSERT( list[0].path == testFile2 );
-    CPPUNIT_ASSERT( true == meta->Backup(testFile2,backup.get(),tape,path) );
-    CPPUNIT_ASSERT( path == testFile2 );
+    CPPUNIT_ASSERT_EQUAL((size_t)1, list.size());
+    CPPUNIT_ASSERT_EQUAL(testFile2, list[0].path.string());
+    write = false;
+    CPPUNIT_ASSERT( meta->Backup(testFile2,backup.get(),tape,path,write) );
+    CPPUNIT_ASSERT_EQUAL(testFile2, path.string());
+    CPPUNIT_ASSERT( write );
     meta->GetBackupList(list);
-    CPPUNIT_ASSERT( 0 == list.size() );
-    CPPUNIT_ASSERT( false == meta->Backup(testFile0,backup.get(),tape,path) );
-    CPPUNIT_ASSERT( false == meta->Backup(testFile1,backup.get(),tape,path) );
-    CPPUNIT_ASSERT( false == meta->Backup(testFile2,backup.get(),tape,path) );
+    CPPUNIT_ASSERT_EQUAL((size_t)0, list.size());
+    CPPUNIT_ASSERT( ! meta->Backup(testFile0,backup.get(),tape,path,write) );
+    CPPUNIT_ASSERT( ! meta->Backup(testFile1,backup.get(),tape,path,write) );
+    CPPUNIT_ASSERT( ! meta->Backup(testFile2,backup.get(),tape,path,write) );
 }
 
 
@@ -433,7 +438,8 @@ MetaManagerTest::testBackupOnWrite()
     CPPUNIT_ASSERT( 1 == list.size() );
 
     backup.reset(new FileOperation(backupFile,0644,O_RDWR));
-    CPPUNIT_ASSERT( true == meta->Backup(testFile,backup.get(),tape,path) );
+    bool write;
+    CPPUNIT_ASSERT( true == meta->Backup(testFile,backup.get(),tape,path,write) );
     CPPUNIT_ASSERT( testFile == path );
     meta->GetBackupList(list);
     CPPUNIT_ASSERT( 0 == list.size() );
@@ -453,7 +459,7 @@ MetaManagerTest::testBackupOnWrite()
     CPPUNIT_ASSERT( 1 == list.size() );
 
     backup.reset( new FileOperationDelay(backupFile,O_WRONLY,0,0,10) );
-    boost::thread thread(&MetaManager::Backup,meta,testFile,backup.get(),tape,path);
+    boost::thread thread(&MetaManager::Backup,meta,testFile,backup.get(),tape,path,write);
     meta->GetBackupList(list);
     CPPUNIT_ASSERT( 1 == list.size() );
     boost::this_thread::sleep(boost::posix_time::milliseconds(2));
@@ -508,8 +514,9 @@ MetaManagerTest::testBackupOnDelete()
     CPPUNIT_ASSERT( 1 == list.size() );
 
     backup.reset( new FileOperationDelay(backupFile,0644,O_WRONLY,0,0,10) );
+    bool write = false;
     thread.reset( new boost::thread(
-            &MetaManager::Backup,meta,testFile,backup.get(),tape,path) );
+            &MetaManager::Backup,meta,testFile,backup.get(),tape,path,write) );
     boost::this_thread::sleep(boost::posix_time::milliseconds(2));
     meta->GetBackupList(list);
     CPPUNIT_ASSERT( 1 == list.size() );
@@ -540,8 +547,9 @@ MetaManagerTest::testBackupOnDelete()
     CPPUNIT_ASSERT( 1 == list.size() );
 
     backup.reset( new FileOperationDelay(backupFile,O_WRONLY,0,0,10) );
+    write = false;
     thread.reset( new boost::thread(
-            &MetaManager::Backup,meta,testFile,backup.get(),tape,path) );
+            &MetaManager::Backup,meta,testFile,backup.get(),tape,path,write) );
     boost::this_thread::sleep(boost::posix_time::milliseconds(2));
     meta->GetBackupList(list);
     CPPUNIT_ASSERT( 1 == list.size() );
@@ -602,8 +610,9 @@ MetaManagerTest::testBackupOnRename()
 
     backup.reset( new FileOperationDelay(backupFile,0644,O_WRONLY,0,0,10) );
     path = testFile;
+    bool write = false;
     thread.reset( new boost::thread(
-            &MetaManager::Backup,meta,testFile,backup.get(),tape,path) );
+            &MetaManager::Backup,meta,testFile,backup.get(),tape,path,write) );
     boost::this_thread::sleep(boost::posix_time::milliseconds(2));
     meta->GetBackupList(list);
     CPPUNIT_ASSERT( 1 == list.size() );
@@ -622,7 +631,6 @@ MetaManagerTest::testBackupOnRename()
     meta->GetBackupList(list);
     CPPUNIT_ASSERT( 0 == list.size() );
 }
-
 
 void
 MetaManagerTest::testPersist()
@@ -684,4 +692,3 @@ MetaManagerTest::testPersist()
     meta->GetBackupList(list);
     CPPUNIT_ASSERT( 3 == list.size() );
 }
-

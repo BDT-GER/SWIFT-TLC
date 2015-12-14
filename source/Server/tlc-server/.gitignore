@@ -7,3 +7,7 @@ vfsserver
 vfsserver-simulator
 lfs_tool
 library_tool
+*.swp
+vfsclient-debug
+vfsserver-debug
+tags
